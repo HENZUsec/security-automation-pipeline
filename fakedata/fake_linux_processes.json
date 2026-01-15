@@ -1,0 +1,33 @@
+{
+  "meta": {"timestamp_utc":"2026-01-14T15:12:45Z","host":"lab-ubuntu-02","count":28},
+  "processes": [
+    {"pid":1,"name":"init","cmd":"/sbin/init"},
+    {"pid":41,"name":"systemd-journald","cmd":"/usr/lib/systemd/systemd-journald"},
+    {"pid":90,"name":"systemd-udevd","cmd":"/usr/lib/systemd/systemd-udevd"},
+    {"pid":142,"name":"systemd-resolved","cmd":"/usr/lib/systemd/systemd-resolved"},
+    {"pid":144,"name":"systemd-timesyncd","cmd":"/usr/lib/systemd/systemd-timesyncd"},
+    {"pid":150,"name":"cron","cmd":"/usr/sbin/cron -f -P"},
+    {"pid":151,"name":"dbus-daemon","cmd":"@dbus-daemon --system --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only"},
+    {"pid":171,"name":"systemd-logind","cmd":"/usr/lib/systemd/systemd-logind"},
+    {"pid":197,"name":"rsyslogd","cmd":"/usr/sbin/rsyslogd -n -iNONE"},
+    {"pid":212,"name":"sshd","cmd":"/usr/sbin/sshd -D"},
+    {"pid":456,"name":"apache2","cmd":"/usr/sbin/apache2 -k start"},
+    {"pid":523,"name":"nc","cmd":"nc -lvnp 4444"},
+    {"pid":612,"name":"python3","cmd":"python3 -m http.server 8000"},
+    {"pid":704,"name":"mysqld","cmd":"/usr/sbin/mysqld --user=mysql"},
+    {"pid":845,"name":"postgres","cmd":"postgres: writer"},
+    {"pid":934,"name":"redis-server","cmd":"redis-server 127.0.0.1:6379"},
+    {"pid":1045,"name":"nginx","cmd":"nginx: worker process"},
+    {"pid":1156,"name":"java","cmd":"java -Xmx2g -jar application.jar"},
+    {"pid":1267,"name":"docker","cmd":"/usr/bin/docker daemon"},
+    {"pid":1378,"name":"socat","cmd":"socat tcp-listen:9999 exec:/bin/bash"},
+    {"pid":1489,"name":"php","cmd":"/usr/sbin/php -S localhost:8080"},
+    {"pid":1590,"name":"fail2ban","cmd":"python3 /usr/bin/fail2ban-server"},
+    {"pid":1701,"name":"polkitd","cmd":"/usr/lib/policykit-1/polkitd --no-debug"},
+    {"pid":1812,"name":"atd","cmd":"/usr/sbin/atd -f"},
+    {"pid":1923,"name":"gpg-agent","cmd":"gpg-agent --supervised"},
+    {"pid":2034,"name":"sshd","cmd":"sshd: admin [priv]"},
+    {"pid":2145,"name":"bash","cmd":"-bash"},
+    {"pid":2256,"name":"bash","cmd":"bash"}
+  ]
+}
