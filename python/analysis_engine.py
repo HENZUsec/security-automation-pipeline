@@ -244,6 +244,17 @@ def main():
     anomalies_path = data_dir / "anomalies.log"
     critical_path = data_dir / "critical_alerts.log"
 
+    # Check if any critical data files exist
+    has_linux_data = linux_json_path.exists()
+    has_windows_data = win_csv_path.exists()
+
+    if not has_linux_data and not has_windows_data:
+        print("[!] Inga datafiler hittades i /data katalogen", file=sys.stderr)
+        print("[!] Kör först ett av collector-skripten:", file=sys.stderr)
+        print("    - Linux:   bash/linux_collector.sh", file=sys.stderr)
+        print("    - Windows: powershell/windows_collector.ps1", file=sys.stderr)
+        return 1
+
     # Load process and service data
     linux_json = read_json(linux_json_path)
     win_rows = read_csv(win_csv_path)
