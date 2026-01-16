@@ -14,8 +14,10 @@ AUTH_LOG="${DATA_DIR}/auth.log"
 ANOMALY_LOG="${DATA_DIR}/anomalies.log"
 CRITICAL_LOG="${DATA_DIR}/critical_alerts.log"
 
+# Generate timestamp
 ts() { date +"%Y-%m-%d %H:%M:%S"; }
 
+# Logging  functions
 log_auth()     { printf "%s AUTH: %s\n"     "$(ts)" "$1" >> "$AUTH_LOG"     2>/dev/null || true; }
 log_anomaly()  { printf "%s ANOMALY: %s\n"  "$(ts)" "$1" >> "$ANOMALY_LOG"  2>/dev/null || true; }
 log_critical() {
@@ -23,6 +25,7 @@ log_critical() {
   log_anomaly "$1"
 }
 
+# Escape special characters for JSON output
 json_escape() {
   local s="${1:-}"
   s="${s//\\/\\\\}"
@@ -39,13 +42,14 @@ mkdir -p "$DATA_DIR" 2>/dev/null || true
 log_auth "Linux check started (user=$(id -un 2>/dev/null || echo unknown))"
 log_auth "Repo root: $REPO_ROOT"
 
-# Read processes from ps
+# Collect running processes
 if ! command -v ps >/dev/null 2>&1; then
   log_critical "Missing command: ps"
 else
+  # Get list of all process names
   procs="$(ps -eo comm= 2>/dev/null || true)"
 
-  # Write linux_processes.json
+  # Build JSON structure with process list
   json="{\"generated_utc\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"processes\":["
   first=1
   while IFS= read -r p; do
@@ -55,27 +59,31 @@ else
   done <<< "$procs"
   json+="]}"
 
+  # Write JSON to output file
   printf "%s\n" "$json" > "$OUT_JSON" 2>/dev/null || log_critical "Failed to write $OUT_JSON"
   log_auth "Wrote: data/linux_processes.json"
 fi
 
-# Read security logs into linux_security_events.log
+# Collect security-related log entries
 {
   echo "=== linux_security_events.log (snapshot) ==="
   echo
 
+  # Collect systemd journal logs if available
   if command -v journalctl >/dev/null 2>&1; then
     echo "=== journalctl -n 200 ==="
     journalctl -n 200 --no-pager 2>/dev/null || true
     echo
   fi
 
+  # Collect authentication logs
   if [[ -f /var/log/auth.log ]]; then
     echo "=== /var/log/auth.log (last 200) ==="
     tail -n 200 /var/log/auth.log 2>/dev/null || true
     echo
   fi
 
+  # Collect system logs
   if [[ -f /var/log/syslog ]]; then
     echo "=== /var/log/syslog (last 200) ==="
     tail -n 200 /var/log/syslog 2>/dev/null || true
@@ -83,12 +91,13 @@ fi
   fi
 } >> "$SEC_LOG" 2>/dev/null || true
 
+# Validate log collection
 if [[ ! -s "$SEC_LOG" ]]; then
   echo "No logs collected (permissions or missing sources)." >> "$SEC_LOG" 2>/dev/null || true
   log_anomaly "linux_security_events.log is empty"
 fi
 
-# Simple detections (easy to explain)
+# Check for risky processes (netcat, hydra, etc.)
 risky=("nc" "netcat" "hydra" "john")
 
 if command -v ps >/dev/null 2>&1; then
@@ -99,6 +108,7 @@ if command -v ps >/dev/null 2>&1; then
   done
 fi
 
+# Count authentication failures in collected logs
 fail_hits="$(grep -iE "failed|failure|invalid user|unauthorized|denied" "$SEC_LOG" 2>/dev/null | wc -l | tr -d ' ' || true)"
 if [[ -n "$fail_hits" && "$fail_hits" -ge 20 ]]; then
   log_critical "High volume of auth-failure indicators in Linux logs: $fail_hits hits"

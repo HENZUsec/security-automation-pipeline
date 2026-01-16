@@ -10,7 +10,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Simple rules 
+# Detection rules for risky processes
 RISKY_PROCESSES = {
     "nc": ("CRITICAL", "often used for reverse shells"),
     "netcat": ("CRITICAL", "often used for reverse shells"),
@@ -18,6 +18,7 @@ RISKY_PROCESSES = {
     "john": ("HIGH", "password cracking tool"),
 }
 
+# Detection rules for risky Windows services
 RISKY_SERVICES = {
     "RemoteRegistry": ("HIGH", "increases attack surface"),
     "Telnet": ("HIGH", "insecure protocol"),
@@ -26,6 +27,7 @@ RISKY_SERVICES = {
     "LanmanServer": ("MEDIUM", "SMB server, review exposure"),
 }
 
+# Regular expressions to detect suspicious patterns in logs
 LOG_PATTERNS = [
     ("CRITICAL", r"\b(smbv1|smb1)\b", "SMBv1 mentioned"),
     ("HIGH", r"\b(bruteforce|password spray|spraying)\b", "brute force wording"),
@@ -33,14 +35,17 @@ LOG_PATTERNS = [
     ("LOW", r"\b(error|warn|warning)\b", "error/warning indicator"),
 ]
 
+# Severity scoring for risk calculation
 SEV_SCORE = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
 SEV_ORDER = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
 
 
+# Generate UTC timestamp for report filenames
 def utc_stamp():
     return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
 
+# Resolve repository paths for data and reports
 def repo_paths():
     script_dir = Path(__file__).resolve().parent
     repo_root = script_dir.parent
@@ -49,8 +54,8 @@ def repo_paths():
     return repo_root, data_dir, report_dir
 
 
+# Read text file and return lines as list
 def read_text(path: Path):
-    # Read lines from a log file
     try:
         if not path.exists():
             return []
@@ -59,8 +64,8 @@ def read_text(path: Path):
         return []
 
 
+# Read and parse JSON file
 def read_json(path: Path):
-    # Read JSON from data/linux_processes.json
     try:
         if not path.exists():
             return {}
@@ -69,8 +74,8 @@ def read_json(path: Path):
         return {}
 
 
+# Read CSV file and return as list of dictionaries
 def read_csv(path: Path):
-    # Read CSV from data/windows_services.csv
     try:
         if not path.exists():
             return []
@@ -84,11 +89,12 @@ def add_finding(findings, severity, text):
     findings.append((severity, text))
 
 
+# Scan Linux processes for security threats
 def scan_linux_processes(linux_json, findings):
     score = 0
     highest = "LOW"
 
-    # Read processes from linux_processes.json
+    # Extract process names from JSON
     processes = linux_json.get("processes", [])
     names = []
     for p in processes:
@@ -97,6 +103,7 @@ def scan_linux_processes(linux_json, findings):
         else:
             names.append(str(p).strip())
 
+    # Check each process against risky process list
     for name in names:
         if not name:
             continue
@@ -111,11 +118,12 @@ def scan_linux_processes(linux_json, findings):
     return score, highest
 
 
+# Scan Windows services for security risks
 def scan_windows_services(rows, findings):
     score = 0
     highest = "LOW"
 
-    # Read services from windows_services.csv
+    # Check each service against risky service list
     for row in rows:
         name = (row.get("Name") or "").strip()
         if not name:
@@ -133,17 +141,19 @@ def scan_windows_services(rows, findings):
     return score, highest
 
 
+# Scan log files for security events and patterns
 def scan_logs(lines, findings):
     score = 0
     highest = "LOW"
 
+    # Pre-compile regex patterns for performance
     compiled = [(sev, re.compile(rx, re.IGNORECASE), reason) for (sev, rx, reason) in LOG_PATTERNS]
 
-    # Count auth failures per IP
+    # Track failed login attempts per IP address
     ip_fails = {}
 
     for line in lines:
-        # Match one pattern per line
+        # Check line against each pattern (first match only)
         for sev, rx, reason in compiled:
             if rx.search(line):
                 add_finding(findings, sev, f"Log: {reason} | {line[:180]}")
@@ -152,14 +162,14 @@ def scan_logs(lines, findings):
                     highest = sev
                 break
 
-        # Extract IPs on failed-like lines
+        # Extract IP addresses from authentication failure lines
         if re.search(r"\bfailed\b|\bfailure\b|\bdenied\b|\bunauthorized\b", line, re.IGNORECASE):
             m = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})", line)
             if m:
                 ip = m.group(1)
                 ip_fails[ip] = ip_fails.get(ip, 0) + 1
 
-    # Simple brute-force thresholds
+    # Detect potential brute force attacks based on failure count
     for ip, count in sorted(ip_fails.items(), key=lambda x: x[1], reverse=True):
         if count >= 10:
             add_finding(findings, "CRITICAL", f"Possible brute force from {ip} ({count} fails)")
@@ -175,11 +185,14 @@ def scan_logs(lines, findings):
     return score, highest
 
 
+# Generate and write security analysis report
 def write_report(path: Path, inputs_used, findings, overall, total_score):
+    # Group findings by severity level
     groups = {"CRITICAL": [], "HIGH": [], "MEDIUM": [], "LOW": []}
     for sev, txt in findings:
         groups.setdefault(sev, []).append(txt)
 
+    # Build report content
     out = []
     out.append("OS Security Automation - Analysis Report")
     out.append("=" * 42)
@@ -192,6 +205,7 @@ def write_report(path: Path, inputs_used, findings, overall, total_score):
         out.append(f"- {p}")
     out.append("")
     out.append("Findings:")
+    # List findings by severity (CRITICAL to LOW)
     for sev in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
         items = groups.get(sev, [])
         if not items:
@@ -217,9 +231,11 @@ def write_report(path: Path, inputs_used, findings, overall, total_score):
     path.write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
+# Main analysis workflow
 def main():
     repo_root, data_dir, report_dir = repo_paths()
 
+    # Define input file paths
     linux_json_path = data_dir / "linux_processes.json"
     win_csv_path = data_dir / "windows_services.csv"
 
@@ -228,43 +244,47 @@ def main():
     anomalies_path = data_dir / "anomalies.log"
     critical_path = data_dir / "critical_alerts.log"
 
-    # Read data from /data
+    # Load process and service data
     linux_json = read_json(linux_json_path)
     win_rows = read_csv(win_csv_path)
 
-    # Read logs from /data
+    # Combine all log files into one list
     lines = []
     lines += read_text(linux_log_path)
     lines += read_text(win_log_path)
     lines += read_text(anomalies_path)
     lines += read_text(critical_path)
 
-    # Track which inputs exist
+    # Record which input files were found and processed
     inputs_used = []
     for p in [linux_json_path, win_csv_path, linux_log_path, win_log_path, anomalies_path, critical_path]:
         if p.exists():
             inputs_used.append(str(p.relative_to(repo_root)))
 
+    # Initialize analysis results
     findings = []
     total = 0
     overall = "LOW"
 
+    # Run Linux process scan
     s, h = scan_linux_processes(linux_json, findings)
     total += s
     if SEV_ORDER[h] > SEV_ORDER[overall]:
         overall = h
 
+    # Run Windows service scan
     s, h = scan_windows_services(win_rows, findings)
     total += s
     if SEV_ORDER[h] > SEV_ORDER[overall]:
         overall = h
 
+    # Run log analysis
     s, h = scan_logs(lines, findings)
     total += s
     if SEV_ORDER[h] > SEV_ORDER[overall]:
         overall = h
 
-    # Write report to /report
+    # Generate timestamped report file
     report_path = report_dir / f"security_report_{utc_stamp()}.txt"
     write_report(report_path, inputs_used, findings, overall, total)
 
